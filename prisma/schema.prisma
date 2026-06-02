@@ -1,0 +1,137 @@
+// ═══════════════════════════════════════════════════════
+// prisma/schema.prisma — Modelo de dados Buscapet
+// ═══════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 Int       @id @default(autoincrement())
+  first_name         String    @db.VarChar(80)
+  last_name          String    @db.VarChar(80)
+  email              String    @unique @db.VarChar(150)
+  phone              String?   @db.VarChar(25)
+  city               String?   @db.VarChar(100)
+  password_hash      String    @db.VarChar(255)
+  avatar_url         String?   @db.VarChar(500)
+  active             Boolean   @default(true)
+  login_attempts     Int       @default(0)
+  reset_token        String?   @db.VarChar(64)
+  reset_token_expiry DateTime?
+  email_verified     Boolean   @default(false)
+  last_login         DateTime?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime? @updatedAt
+
+  pets               Pet[]
+
+  @@map("users")
+}
+
+model Pet {
+  id          Int       @id @default(autoincrement())
+  type        PetType
+  user_id     Int
+  name        String?   @db.VarChar(100)
+  species     String    @db.VarChar(50)
+  breed       String?   @db.VarChar(100)
+  color       String    @db.VarChar(100)
+  size        PetSize
+  gender      PetGender?
+  date        DateTime? @db.Date
+  location    String    @db.VarChar(255)
+  description String?   @db.Text
+  owner_name  String    @db.VarChar(150)
+  owner_phone String?   @db.VarChar(25)
+  owner_email String    @db.VarChar(150)
+  photo       String?   @db.LongText
+  status      PetStatus @default(active)
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  user              User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  matches_as_lost   Match[]   @relation("LostPet")
+  matches_as_found  Match[]   @relation("FoundPet")
+
+  @@index([type])
+  @@index([status])
+  @@index([user_id])
+  @@index([species])
+  @@index([type, status])
+  @@map("pets")
+}
+
+model Match {
+  id           Int         @id @default(autoincrement())
+  lost_pet_id  Int
+  found_pet_id Int
+  score        Int         @default(0)
+  status       MatchStatus @default(active)
+  confirmed_at DateTime?
+  created_at   DateTime    @default(now())
+  updated_at   DateTime?   @updatedAt
+
+  lost_pet     Pet         @relation("LostPet",  fields: [lost_pet_id],  references: [id], onDelete: Cascade)
+  found_pet    Pet         @relation("FoundPet", fields: [found_pet_id], references: [id], onDelete: Cascade)
+
+  @@unique([lost_pet_id, found_pet_id])
+  @@index([status])
+  @@index([score(sort: Desc)])
+  @@map("matches")
+}
+
+model MatchRun {
+  id              Int          @id @default(autoincrement())
+  trigger_type    TriggerType  @default(cron)
+  lost_count      Int          @default(0)
+  found_count     Int          @default(0)
+  new_matches     Int          @default(0)
+  updated_matches Int          @default(0)
+  duration_ms     Int?
+  ran_at          DateTime     @default(now())
+
+  @@index([ran_at(sort: Desc)])
+  @@map("match_runs")
+}
+
+// ── Enums ──────────────────────────────────────────────
+enum PetType {
+  lost
+  found
+}
+
+enum PetSize {
+  pequeno
+  medio   @map("médio")
+  grande
+}
+
+enum PetGender {
+  macho
+  femea   @map("fêmea")
+}
+
+enum PetStatus {
+  active
+  matched
+  resolved
+}
+
+enum MatchStatus {
+  active
+  confirmed
+  dismissed
+  resolved
+}
+
+enum TriggerType {
+  cron
+  manual
+  startup
+}
